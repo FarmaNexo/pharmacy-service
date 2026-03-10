@@ -8,10 +8,10 @@ server:
   idle_timeout: 60s
 
 database:
-  host: ${DATABASE_HOST}
+  host: ${DB_HOST}
   port: 5432
-  user: ${DATABASE_USER}
-  password: ${DATABASE_PASSWORD}
+  user: ${DB_USER}
+  password: ${DB_PASSWORD}
   db_name: pharmacy_db
   schema: pharmacy
   sslmode: require
