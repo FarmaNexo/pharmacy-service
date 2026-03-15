@@ -3,6 +3,7 @@ package cache
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -16,14 +17,24 @@ type RedisClient struct {
 	logger *zap.Logger
 }
 
-func NewRedisClient(cfg config.RedisConfig, logger *zap.Logger) (*RedisClient, error) {
-	client := redis.NewClient(&redis.Options{
+func NewRedisClient(cfg config.RedisConfig, environment string, logger *zap.Logger) (*RedisClient, error) {
+	opts := &redis.Options{
 		Addr:       cfg.GetAddr(),
 		Password:   cfg.Password,
 		DB:         cfg.DB,
 		MaxRetries: cfg.MaxRetries,
 		PoolSize:   cfg.PoolSize,
-	})
+	}
+
+	// TLS requerido en ambientes AWS (development, production)
+	if environment != "local" {
+		opts.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+		logger.Info("Redis TLS habilitado", zap.String("environment", environment))
+	}
+
+	client := redis.NewClient(opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

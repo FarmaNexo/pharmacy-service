@@ -104,7 +104,7 @@ func main() {
 		logger.Fatal("Error inicializando SQS EventPublisher", zap.Error(err))
 	}
 
-	redisClient, err := cache.NewRedisClient(cfg.Redis, logger)
+	redisClient, err := cache.NewRedisClient(cfg.Redis, cfg.Environment, logger)
 	if err != nil {
 		logger.Fatal("Error inicializando Redis", zap.Error(err))
 	}
