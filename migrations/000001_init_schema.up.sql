@@ -3,8 +3,10 @@
 
 CREATE SCHEMA IF NOT EXISTS pharmacy;
 
--- Habilitar PostGIS
-CREATE EXTENSION IF NOT EXISTS postgis;
+-- PostGIS: la extension debe crearse manualmente con el usuario master de Aurora
+-- (el usuario de la app no tiene permisos de CREATE EXTENSION). Ejecutar una vez:
+--   CREATE EXTENSION IF NOT EXISTS postgis;
+-- en el database pharmacy_db desde el bastion con el master password.
 
 -- Farmacias
 CREATE TABLE pharmacy.pharmacies (
