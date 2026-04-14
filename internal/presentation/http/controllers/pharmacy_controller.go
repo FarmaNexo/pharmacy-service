@@ -495,7 +495,7 @@ func (c *PharmacyController) UploadAuthorizationDocument(w http.ResponseWriter, 
 // @Param        limit    query    int     false  "Límite por página" default(20)
 // @Success      200  {object}  common.ApiResponse[responses.PharmacyListResponse]
 // @Failure      400  {object}  common.ApiResponse[responses.PharmacyListResponse]
-// @Router       /api/v1/chains/{chainId}/pharmacies [get]
+// @Router       /api/v1/pharmacies/chains/{chainId} [get]
 func (c *PharmacyController) ListPharmaciesByChain(w http.ResponseWriter, r *http.Request) {
 	chainID := chi.URLParam(r, "chainId")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))

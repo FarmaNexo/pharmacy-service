@@ -101,13 +101,11 @@ func SetupRoutes(
 				r.Put("/{id}/verify", pharmacyController.VerifyPharmacy)
 				r.Delete("/{id}", pharmacyController.DeletePharmacy)
 			})
-		})
 
-		// ========================================
-		// CADENAS DE FARMACIAS
-		// ========================================
-		r.Route("/chains", func(r chi.Router) {
-			r.Get("/{chainId}/pharmacies", pharmacyController.ListPharmaciesByChain)
+			// ========================================
+			// CADENAS DE FARMACIAS
+			// ========================================
+			r.Get("/chains/{chainId}", pharmacyController.ListPharmaciesByChain)
 		})
 	})
 

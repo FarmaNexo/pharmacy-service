@@ -104,9 +104,9 @@ curl http://localhost:4004/api/v1/pharmacies/{id}/inventory
 curl http://localhost:4004/api/v1/pharmacies/{id}/hours
 ```
 
-**GET /api/v1/chains/{chainId}/pharmacies** - Farmacias por cadena
+**GET /api/v1/pharmacies/chains/{chainId}** - Farmacias por cadena
 ```bash
-curl "http://localhost:4004/api/v1/chains/INKAFARMA/pharmacies?page=1&limit=20"
+curl "http://localhost:4004/api/v1/pharmacies/chains/INKAFARMA?page=1&limit=20"
 ```
 
 ### Owner (requieren JWT + rol pharmacy_owner o admin)
