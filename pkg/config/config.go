@@ -20,7 +20,19 @@ type Config struct {
 	AWS         AWSConfig      `mapstructure:"aws"`
 	SQS         SQSConfig      `mapstructure:"sqs"`
 	S3          S3Config       `mapstructure:"s3"`
+	Services    ServicesConfig `mapstructure:"services"`
 	Log         LogConfig      `mapstructure:"log"`
+}
+
+// ServicesConfig — URLs HTTP a otros microservicios.
+type ServicesConfig struct {
+	CatalogService CatalogServiceConfig `mapstructure:"catalog_service"`
+}
+
+// CatalogServiceConfig — URL del catalog-service. Apunta al ALB interno.
+// Usado para resolver lookups durante el procesamiento de INVENTORY_DISCOVERED.
+type CatalogServiceConfig struct {
+	BaseURL string `mapstructure:"base_url"`
 }
 
 type ServerConfig struct {
@@ -69,8 +81,14 @@ type AWSConfig struct {
 }
 
 type SQSConfig struct {
+	// PharmacyEventsQueueURL — eventos OUTBOUND publicados por pharmacy-service.
 	PharmacyEventsQueueURL string `mapstructure:"pharmacy_events_queue_url"`
-	CatalogEventsQueueURL  string `mapstructure:"catalog_events_queue_url"`
+	// CatalogEventsQueueURL — eventos publicados por catalog-service que
+	// pharmacy podría consumir (no usado actualmente, mantenido por compat).
+	CatalogEventsQueueURL string `mapstructure:"catalog_events_queue_url"`
+	// ScraperEventsQueueURL — INBOUND: PHARMACY_DISCOVERED + INVENTORY_DISCOVERED
+	// del scraper (Tier 5).
+	ScraperEventsQueueURL string `mapstructure:"scraper_events_queue_url"`
 }
 
 type S3Config struct {

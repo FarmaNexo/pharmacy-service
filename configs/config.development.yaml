@@ -39,6 +39,14 @@ aws:
 sqs:
   pharmacy_events_queue_url: "${SQS_PHARMACY_EVENTS_URL}"
   catalog_events_queue_url: "${SQS_CATALOG_EVENTS_URL}"
+  # INBOUND: PHARMACY_DISCOVERED + INVENTORY_DISCOVERED del scraper (Tier 5).
+  scraper_events_queue_url: "${SQS_SCRAPER_EVENTS_QUEUE_URL}"
+
+services:
+  # URL del catalog-service via ALB interno. Usado para resolver lookups
+  # durante el procesamiento de INVENTORY_DISCOVERED (Tier 5).
+  catalog_service:
+    base_url: "${CATALOG_SERVICE_URL}"
 
 s3:
   pharmacies_bucket: "farmanexo-pharmacies"

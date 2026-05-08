@@ -61,11 +61,25 @@ type GeoFilter struct {
 
 func (g GeoFilter) IsActive() bool { return g.Lat != 0 || g.Lng != 0 }
 
+// InventoryUpsertParams — payload para UpsertByPharmacyAndProduct. Lo
+// invoca el SQS consumer de INVENTORY_DISCOVERED tras resolver los UUIDs
+// de farmacia y producto via lookups locales/HTTP.
+type InventoryUpsertParams struct {
+	PharmacyID  string
+	ProductID   string
+	Stock       int
+	Price       float64
+	IsAvailable bool
+}
+
 type InventoryRepository interface {
 	Create(ctx context.Context, item *entities.PharmacyInventory) error
 	FindByPharmacyID(ctx context.Context, pharmacyID string) ([]entities.PharmacyInventory, error)
 	FindByPharmacyAndProduct(ctx context.Context, pharmacyID, productID string) (*entities.PharmacyInventory, error)
 	FindByProductID(ctx context.Context, productID string, geo GeoFilter) ([]InventoryWithPharmacy, error)
 	Update(ctx context.Context, item *entities.PharmacyInventory) error
+	// UpsertByPharmacyAndProduct hace INSERT ... ON CONFLICT (pharmacy_id, product_id)
+	// DO UPDATE. Idempotente. Usado por el SQS consumer de INVENTORY_DISCOVERED.
+	UpsertByPharmacyAndProduct(ctx context.Context, params InventoryUpsertParams) error
 	Delete(ctx context.Context, pharmacyID, productID string) error
 }

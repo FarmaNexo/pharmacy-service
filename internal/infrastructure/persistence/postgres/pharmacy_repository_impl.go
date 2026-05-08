@@ -4,6 +4,8 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/farmanexo/pharmacy-service/internal/domain/entities"
@@ -243,6 +245,154 @@ func (r *PharmacyRepositoryImpl) SoftDelete(ctx context.Context, id string) erro
 		return fmt.Errorf("pharmacy not found")
 	}
 	return nil
+}
+
+// FindBySourceCode busca por la clave natural DIGEMID. Usado por el SQS
+// consumer para resolver INVENTORY_DISCOVERED → pharmacy_id local.
+func (r *PharmacyRepositoryImpl) FindBySourceCode(ctx context.Context, sourcePharmacyCode string) (*entities.Pharmacy, error) {
+	var pharmacy entities.Pharmacy
+	query := `SELECT ` + pharmacySelectColumns + `
+		FROM pharmacy.pharmacies
+		WHERE source_pharmacy_code = $1 AND deleted_at IS NULL
+	`
+	result := r.db.WithContext(ctx).Raw(query, sourcePharmacyCode).Scan(&pharmacy)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+	return &pharmacy, nil
+}
+
+// UpsertBySource hace INSERT ... ON CONFLICT (source_pharmacy_code) DO UPDATE.
+// Idempotente. Reglas de merge:
+//   - name → siempre se sobrescribe con el valor del evento.
+//   - phone/email/ruc/etc. → COALESCE: no borra valor previo si el evento trae vacío.
+//   - location (PostGIS) → si el evento trae lat/lng, se actualiza; si no, se preserva.
+//
+// Slug determinístico: slugify(name + "-" + source_pharmacy_code) — único por fuente.
+// owner_user_id queda NULL (la migración 000004 lo permite); se reclamará cuando
+// el dueño se registre en FarmaNexo.
+func (r *PharmacyRepositoryImpl) UpsertBySource(ctx context.Context, p repositories.PharmacyUpsertParams) (string, error) {
+	slug := buildPharmacySlugFromSource(p.CanonicalName, p.SourcePharmacyCode)
+
+	// Distrito → city (convención DIGEMID Perú); Departamento → state.
+	city := firstNonEmptyStr(p.Distrito, p.Provincia)
+	state := p.Departamento
+
+	var resultID string
+	var execErr error
+
+	if p.Latitude != nil && p.Longitude != nil {
+		execErr = r.db.WithContext(ctx).Raw(`
+			INSERT INTO pharmacy.pharmacies (
+				name, slug, phone, email, website, logo_url,
+				source_pharmacy_code, ruc, technical_director, hours_raw,
+				chain_id, chain_name,
+				street, city, state, postal_code, country, location,
+				is_verified, is_active, is_24h, created_at, updated_at
+			) VALUES (
+				?, ?, NULLIF(?, ''), NULLIF(?, ''), '', '',
+				?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
+				NULLIF(?, ''), NULLIF(?, ''),
+				NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), '', 'Perú',
+				ST_MakePoint(?, ?)::geography,
+				false, true, false, NOW(), NOW()
+			)
+			ON CONFLICT (source_pharmacy_code)
+			WHERE source_pharmacy_code IS NOT NULL
+			DO UPDATE SET
+				name               = EXCLUDED.name,
+				phone              = COALESCE(EXCLUDED.phone, pharmacy.pharmacies.phone),
+				email              = COALESCE(EXCLUDED.email, pharmacy.pharmacies.email),
+				ruc                = COALESCE(EXCLUDED.ruc, pharmacy.pharmacies.ruc),
+				technical_director = COALESCE(EXCLUDED.technical_director, pharmacy.pharmacies.technical_director),
+				hours_raw          = COALESCE(EXCLUDED.hours_raw, pharmacy.pharmacies.hours_raw),
+				chain_id           = COALESCE(EXCLUDED.chain_id, pharmacy.pharmacies.chain_id),
+				chain_name         = COALESCE(EXCLUDED.chain_name, pharmacy.pharmacies.chain_name),
+				street             = COALESCE(EXCLUDED.street, pharmacy.pharmacies.street),
+				city               = COALESCE(EXCLUDED.city, pharmacy.pharmacies.city),
+				state              = COALESCE(EXCLUDED.state, pharmacy.pharmacies.state),
+				location           = COALESCE(pharmacy.pharmacies.location, EXCLUDED.location),
+				updated_at         = NOW()
+			RETURNING id::text
+		`,
+			p.CanonicalName, slug, p.Phone, p.Email,
+			p.SourcePharmacyCode, p.RUC, p.TechnicalDirector, p.Hours,
+			p.ChainID, p.ChainName,
+			p.FullAddress, city, state,
+			*p.Longitude, *p.Latitude,
+		).Scan(&resultID).Error
+	} else {
+		execErr = r.db.WithContext(ctx).Raw(`
+			INSERT INTO pharmacy.pharmacies (
+				name, slug, phone, email, website, logo_url,
+				source_pharmacy_code, ruc, technical_director, hours_raw,
+				chain_id, chain_name,
+				street, city, state, postal_code, country,
+				is_verified, is_active, is_24h, created_at, updated_at
+			) VALUES (
+				?, ?, NULLIF(?, ''), NULLIF(?, ''), '', '',
+				?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
+				NULLIF(?, ''), NULLIF(?, ''),
+				NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), '', 'Perú',
+				false, true, false, NOW(), NOW()
+			)
+			ON CONFLICT (source_pharmacy_code)
+			WHERE source_pharmacy_code IS NOT NULL
+			DO UPDATE SET
+				name               = EXCLUDED.name,
+				phone              = COALESCE(EXCLUDED.phone, pharmacy.pharmacies.phone),
+				email              = COALESCE(EXCLUDED.email, pharmacy.pharmacies.email),
+				ruc                = COALESCE(EXCLUDED.ruc, pharmacy.pharmacies.ruc),
+				technical_director = COALESCE(EXCLUDED.technical_director, pharmacy.pharmacies.technical_director),
+				hours_raw          = COALESCE(EXCLUDED.hours_raw, pharmacy.pharmacies.hours_raw),
+				chain_id           = COALESCE(EXCLUDED.chain_id, pharmacy.pharmacies.chain_id),
+				chain_name         = COALESCE(EXCLUDED.chain_name, pharmacy.pharmacies.chain_name),
+				street             = COALESCE(EXCLUDED.street, pharmacy.pharmacies.street),
+				city               = COALESCE(EXCLUDED.city, pharmacy.pharmacies.city),
+				state              = COALESCE(EXCLUDED.state, pharmacy.pharmacies.state),
+				updated_at         = NOW()
+			RETURNING id::text
+		`,
+			p.CanonicalName, slug, p.Phone, p.Email,
+			p.SourcePharmacyCode, p.RUC, p.TechnicalDirector, p.Hours,
+			p.ChainID, p.ChainName,
+			p.FullAddress, city, state,
+		).Scan(&resultID).Error
+	}
+
+	if execErr != nil {
+		return "", execErr
+	}
+	if resultID == "" {
+		return "", fmt.Errorf("UPSERT pharmacy no retornó id (source_pharmacy_code=%s)", p.SourcePharmacyCode)
+	}
+	return resultID, nil
+}
+
+// ----- Helpers internos para UpsertBySource -----
+
+var slugPharmacyReplacer = regexp.MustCompile(`[^a-z0-9]+`)
+
+func slugifyPharmacy(s string) string {
+	s = strings.ToLower(s)
+	s = slugPharmacyReplacer.ReplaceAllString(s, "-")
+	return strings.Trim(s, "-")
+}
+
+func buildPharmacySlugFromSource(name, sourceCode string) string {
+	return slugifyPharmacy(name + "-" + sourceCode)
+}
+
+func firstNonEmptyStr(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 var _ repositories.PharmacyRepository = (*PharmacyRepositoryImpl)(nil)

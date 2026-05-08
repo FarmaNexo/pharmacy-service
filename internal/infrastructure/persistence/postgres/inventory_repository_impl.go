@@ -283,4 +283,20 @@ func (r *InventoryRepositoryImpl) findByProductIDWithGeo(ctx context.Context, pr
 	return items, nil
 }
 
+// UpsertByPharmacyAndProduct hace INSERT ... ON CONFLICT (pharmacy_id, product_id)
+// DO UPDATE. Idempotente. Lo invoca el SQS consumer de INVENTORY_DISCOVERED.
+func (r *InventoryRepositoryImpl) UpsertByPharmacyAndProduct(ctx context.Context, p repositories.InventoryUpsertParams) error {
+	return r.db.WithContext(ctx).Exec(`
+		INSERT INTO pharmacy.pharmacy_inventory
+			(pharmacy_id, product_id, stock, price, is_available, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+		ON CONFLICT (pharmacy_id, product_id)
+		DO UPDATE SET
+			stock        = EXCLUDED.stock,
+			price        = EXCLUDED.price,
+			is_available = EXCLUDED.is_available,
+			updated_at   = NOW()
+	`, p.PharmacyID, p.ProductID, p.Stock, p.Price, p.IsAvailable).Error
+}
+
 var _ repositories.InventoryRepository = (*InventoryRepositoryImpl)(nil)

@@ -16,6 +16,7 @@ import (
 	"github.com/farmanexo/pharmacy-service/internal/application/preprocessors"
 	"github.com/farmanexo/pharmacy-service/internal/application/validators"
 	"github.com/farmanexo/pharmacy-service/internal/infrastructure/cache"
+	"github.com/farmanexo/pharmacy-service/internal/infrastructure/clients"
 	"github.com/farmanexo/pharmacy-service/internal/infrastructure/messaging"
 	"github.com/farmanexo/pharmacy-service/internal/infrastructure/persistence/postgres"
 	"github.com/farmanexo/pharmacy-service/internal/infrastructure/security"
@@ -188,6 +189,14 @@ func main() {
 	mediator.RegisterHandler(med, updateHoursHandler)
 
 	// ========================================
+	// HANDLERS - Scraper events (Tier 5)
+	// No registrados en mediator: invocados directamente por el SQS consumer.
+	// ========================================
+	catalogClient := clients.NewCatalogClient(cfg.Services.CatalogService.BaseURL, logger)
+	upsertPharmacyFromEventHandler := handlers.NewUpsertPharmacyFromEventHandler(pharmacyRepo, logger)
+	upsertInventoryFromEventHandler := handlers.NewUpsertInventoryFromEventHandler(pharmacyRepo, inventoryRepo, catalogClient, logger)
+
+	// ========================================
 	// VALIDATORS
 	// ========================================
 	createPharmacyValidator := validators.NewCreatePharmacyValidator()
@@ -224,6 +233,20 @@ func main() {
 	router := routes.SetupRoutes(pharmacyController, authMiddleware)
 
 	// ========================================
+	// SQS Scraper Consumer (Tier 5)
+	// Consume PHARMACY_DISCOVERED + INVENTORY_DISCOVERED de
+	// farmanexo-{env}-scraper-events. Para INVENTORY hace lookup local
+	// de pharmacy + lookup HTTP a catalog-service para resolver product_id.
+	// ========================================
+	scraperConsumer, err := messaging.NewSQSScraperConsumer(cfg.AWS, cfg.SQS, upsertPharmacyFromEventHandler, upsertInventoryFromEventHandler, logger)
+	if err != nil {
+		logger.Fatal("Error inicializando SQS ScraperConsumer", zap.Error(err))
+	}
+	scraperConsumerCtx, scraperConsumerCancel := context.WithCancel(context.Background())
+	defer scraperConsumerCancel()
+	scraperConsumer.Start(scraperConsumerCtx)
+
+	// ========================================
 	// SERVIDOR HTTP
 	// ========================================
 	server := &http.Server{
@@ -255,6 +278,8 @@ func main() {
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
+
+	scraperConsumer.Stop()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Error en shutdown", zap.Error(err))
