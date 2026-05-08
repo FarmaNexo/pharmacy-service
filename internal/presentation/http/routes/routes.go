@@ -65,6 +65,8 @@ func SetupRoutes(
 			// ========================================
 			r.Get("/", pharmacyController.ListPharmacies)
 			r.Post("/nearby", pharmacyController.SearchNearbyPharmacies)
+			r.Get("/slug/{slug}", pharmacyController.GetPharmacyBySlug)
+			r.Get("/inventory/product/{productId}", pharmacyController.GetInventoryByProduct)
 			r.Get("/{id}", pharmacyController.GetPharmacy)
 			r.Get("/{id}/inventory", pharmacyController.GetPharmacyInventory)
 			r.Get("/{id}/hours", pharmacyController.GetPharmacyHours)

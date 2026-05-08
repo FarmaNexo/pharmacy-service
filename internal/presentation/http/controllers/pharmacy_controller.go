@@ -107,6 +107,76 @@ func (c *PharmacyController) GetPharmacy(w http.ResponseWriter, r *http.Request)
 	c.respondJSON(w, response)
 }
 
+// GetPharmacyBySlug godoc
+// @Summary      Obtener farmacia por slug
+// @Description  Retorna el detalle de una farmacia usando su slug SEO-friendly
+// @Tags         Pharmacies
+// @Produce      json
+// @Param        slug   path     string  true  "Pharmacy slug"
+// @Success      200  {object}  common.ApiResponse[responses.PharmacyResponse]
+// @Failure      404  {object}  common.ApiResponse[responses.PharmacyResponse]
+// @Router       /api/v1/pharmacies/slug/{slug} [get]
+func (c *PharmacyController) GetPharmacyBySlug(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	query := queries.GetPharmacyBySlugQuery{Slug: slug}
+
+	response, _ := mediator.Send[queries.GetPharmacyBySlugQuery, responses.PharmacyResponse](r.Context(), c.mediator, query)
+	c.respondJSON(w, response)
+}
+
+// GetInventoryByProduct godoc
+// @Summary      Comparador de precios — inventario de un producto en todas las farmacias
+// @Description  Retorna la lista de farmacias activas que tienen un producto dado. Sin lat/lng → orden por precio. Con lat/lng → incluye distance_km y orden por cercanía. radius_km opcional filtra por radio.
+// @Tags         Pharmacies
+// @Produce      json
+// @Param        productId   path     string   true   "Product ID (UUID)"
+// @Param        lat         query    number   false  "Latitud del usuario (HU-014)"
+// @Param        lng         query    number   false  "Longitud del usuario (HU-014)"
+// @Param        radius_km   query    number   false  "Radio en km (1–100). Solo se aplica si lat y lng están presentes"
+// @Success      200  {object}  common.ApiResponse[responses.InventoryListResponse]
+// @Failure      400  {object}  common.ApiResponse[responses.InventoryListResponse]
+// @Router       /api/v1/pharmacies/inventory/product/{productId} [get]
+func (c *PharmacyController) GetInventoryByProduct(w http.ResponseWriter, r *http.Request) {
+	productID := chi.URLParam(r, "productId")
+
+	query := queries.ListInventoryByProductQuery{ProductID: productID}
+
+	// Geolocalización opcional (HU-014). Sanitización al boundary:
+	// validamos rangos aquí antes de enviar al mediator. Si lat o lng vienen
+	// mal formados o fuera de rango, los ignoramos silenciosamente y la
+	// query se ejecuta como antes (orden por precio).
+	if lat, ok := parseFloatQuery(r, "lat", -90, 90); ok {
+		if lng, ok := parseFloatQuery(r, "lng", -180, 180); ok {
+			query.Latitude = lat
+			query.Longitude = lng
+			if radius, ok := parseFloatQuery(r, "radius_km", 0.0001, 100); ok {
+				query.RadiusKm = radius
+			}
+		}
+	}
+
+	response, _ := mediator.Send[queries.ListInventoryByProductQuery, responses.InventoryListResponse](r.Context(), c.mediator, query)
+	c.respondJSON(w, response)
+}
+
+// parseFloatQuery lee un query param float dentro del rango [min,max]
+// inclusive. Devuelve (0, false) si el param falta, no parsea, o sale del
+// rango. Usado por endpoints con geo opcional para sanitizar al borde.
+func parseFloatQuery(r *http.Request, key string, min, max float64) (float64, bool) {
+	raw := r.URL.Query().Get(key)
+	if raw == "" {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, false
+	}
+	if v < min || v > max {
+		return 0, false
+	}
+	return v, true
+}
+
 // SearchNearbyPharmacies godoc
 // @Summary      Farmacias cercanas
 // @Description  Busca farmacias cercanas usando geolocalización (PostGIS)
@@ -195,23 +265,26 @@ func (c *PharmacyController) CreatePharmacy(w http.ResponseWriter, r *http.Reque
 	userID, _ := middlewares.GetUserIDFromContext(r.Context())
 
 	cmd := commands.CreatePharmacyCommand{
-		OwnerUserID: userID,
-		Name:        req.Name,
-		Slug:        req.Slug,
-		Description: req.Description,
-		Phone:       req.Phone,
-		Email:       req.Email,
-		Website:     req.Website,
-		Street:      req.Street,
-		City:        req.City,
-		State:       req.State,
-		PostalCode:  req.PostalCode,
-		Country:     req.Country,
-		Latitude:    req.Latitude,
-		Longitude:   req.Longitude,
-		Is24h:       req.Is24h,
-		ChainID:     req.ChainID,
-		ChainName:   req.ChainName,
+		OwnerUserID:       userID,
+		Name:              req.Name,
+		Slug:              req.Slug,
+		Description:       req.Description,
+		Phone:             req.Phone,
+		Email:             req.Email,
+		Website:           req.Website,
+		Street:            req.Street,
+		City:              req.City,
+		State:             req.State,
+		PostalCode:        req.PostalCode,
+		Country:           req.Country,
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		Is24h:             req.Is24h,
+		ChainID:           req.ChainID,
+		ChainName:         req.ChainName,
+		RUC:               req.RUC,
+		TechnicalDirector: req.TechnicalDirector,
+		HoursRaw:          req.HoursRaw,
 	}
 
 	response, _ := mediator.Send[commands.CreatePharmacyCommand, responses.PharmacyResponse](r.Context(), c.mediator, cmd)
@@ -240,24 +313,27 @@ func (c *PharmacyController) UpdatePharmacy(w http.ResponseWriter, r *http.Reque
 	}
 
 	cmd := commands.UpdatePharmacyCommand{
-		ID:          pharmacyID,
-		Name:        req.Name,
-		Slug:        req.Slug,
-		Description: req.Description,
-		Phone:       req.Phone,
-		Email:       req.Email,
-		Website:     req.Website,
-		Street:      req.Street,
-		City:        req.City,
-		State:       req.State,
-		PostalCode:  req.PostalCode,
-		Country:     req.Country,
-		Latitude:    req.Latitude,
-		Longitude:   req.Longitude,
-		Is24h:       req.Is24h,
-		IsActive:    req.IsActive,
-		ChainID:     req.ChainID,
-		ChainName:   req.ChainName,
+		ID:                pharmacyID,
+		Name:              req.Name,
+		Slug:              req.Slug,
+		Description:       req.Description,
+		Phone:             req.Phone,
+		Email:             req.Email,
+		Website:           req.Website,
+		Street:            req.Street,
+		City:              req.City,
+		State:             req.State,
+		PostalCode:        req.PostalCode,
+		Country:           req.Country,
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		Is24h:             req.Is24h,
+		IsActive:          req.IsActive,
+		ChainID:           req.ChainID,
+		ChainName:         req.ChainName,
+		RUC:               req.RUC,
+		TechnicalDirector: req.TechnicalDirector,
+		HoursRaw:          req.HoursRaw,
 	}
 
 	response, _ := mediator.Send[commands.UpdatePharmacyCommand, responses.PharmacyResponse](r.Context(), c.mediator, cmd)

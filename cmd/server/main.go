@@ -131,6 +131,12 @@ func main() {
 	getPharmacyHandler := handlers.NewGetPharmacyHandler(pharmacyRepo, hoursRepo, cacheService, logger)
 	mediator.RegisterHandler(med, getPharmacyHandler)
 
+	getPharmacyBySlugHandler := handlers.NewGetPharmacyBySlugHandler(pharmacyRepo, hoursRepo, cacheService, logger)
+	mediator.RegisterHandler(med, getPharmacyBySlugHandler)
+
+	listInventoryByProductHandler := handlers.NewListInventoryByProductHandler(inventoryRepo, cacheService, logger)
+	mediator.RegisterHandler(med, listInventoryByProductHandler)
+
 	searchNearbyHandler := handlers.NewSearchNearbyPharmaciesHandler(pharmacyRepo, cacheService, logger)
 	mediator.RegisterHandler(med, searchNearbyHandler)
 

@@ -90,7 +90,11 @@ func (h *UploadAuthorizationDocumentHandler) Handle(ctx context.Context, cmd com
 
 	// Publish event
 	go func() {
-		event := events.NewPharmacyEvent(events.EventAuthorizationUploaded, cmd.PharmacyID, pharmacy.OwnerUserID)
+		ownerID := ""
+		if pharmacy.OwnerUserID != nil {
+			ownerID = *pharmacy.OwnerUserID
+		}
+		event := events.NewPharmacyEvent(events.EventAuthorizationUploaded, cmd.PharmacyID, ownerID)
 		event.Metadata["document_url"] = url
 		if err := h.eventPublisher.Publish(context.Background(), event); err != nil {
 			h.logger.Error("Error publicando evento AUTHORIZATION_UPLOADED", zap.Error(err))

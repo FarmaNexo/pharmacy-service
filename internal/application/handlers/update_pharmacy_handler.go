@@ -89,6 +89,15 @@ func (h *UpdatePharmacyHandler) Handle(ctx context.Context, cmd commands.UpdateP
 	if cmd.ChainName != "" {
 		pharmacy.ChainName = cmd.ChainName
 	}
+	if cmd.RUC != "" {
+		pharmacy.RUC = cmd.RUC
+	}
+	if cmd.TechnicalDirector != "" {
+		pharmacy.TechnicalDirector = cmd.TechnicalDirector
+	}
+	if cmd.HoursRaw != "" {
+		pharmacy.HoursRaw = cmd.HoursRaw
+	}
 
 	if err := h.pharmacyRepo.Update(ctx, pharmacy); err != nil {
 		h.logger.Error("Error actualizando farmacia", zap.Error(err))

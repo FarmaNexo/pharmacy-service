@@ -54,26 +54,33 @@ func (h *CreatePharmacyHandler) Handle(ctx context.Context, cmd commands.CreateP
 	}
 
 	pharmacy := &entities.Pharmacy{
-		ID:          uuid.New().String(),
-		OwnerUserID: cmd.OwnerUserID,
-		Name:        cmd.Name,
-		Slug:        slug,
-		Description: cmd.Description,
-		Phone:       cmd.Phone,
-		Email:       cmd.Email,
-		Website:     cmd.Website,
-		Street:      cmd.Street,
-		City:        cmd.City,
-		State:       cmd.State,
-		PostalCode:  cmd.PostalCode,
-		Country:     country,
-		Latitude:    cmd.Latitude,
-		Longitude:   cmd.Longitude,
-		Is24h:       cmd.Is24h,
-		ChainID:     cmd.ChainID,
-		ChainName:   cmd.ChainName,
-		IsActive:    true,
-		IsVerified:  false,
+		ID:                uuid.New().String(),
+		Name:              cmd.Name,
+		Slug:              slug,
+		Description:       cmd.Description,
+		Phone:             cmd.Phone,
+		Email:             cmd.Email,
+		Website:           cmd.Website,
+		Street:            cmd.Street,
+		City:              cmd.City,
+		State:             cmd.State,
+		PostalCode:        cmd.PostalCode,
+		Country:           country,
+		Latitude:          cmd.Latitude,
+		Longitude:         cmd.Longitude,
+		Is24h:             cmd.Is24h,
+		ChainID:           cmd.ChainID,
+		ChainName:         cmd.ChainName,
+		RUC:               cmd.RUC,
+		TechnicalDirector: cmd.TechnicalDirector,
+		HoursRaw:          cmd.HoursRaw,
+		IsActive:          true,
+		IsVerified:        false,
+	}
+	// OwnerUserID puede venir vacío (flujo scraper). Si se proporciona, lo seteamos.
+	if cmd.OwnerUserID != "" {
+		owner := cmd.OwnerUserID
+		pharmacy.OwnerUserID = &owner
 	}
 
 	if err := h.pharmacyRepo.Create(ctx, pharmacy); err != nil {

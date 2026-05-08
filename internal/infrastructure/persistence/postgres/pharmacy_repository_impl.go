@@ -25,6 +25,7 @@ func NewPharmacyRepository(db *gorm.DB, logger *zap.Logger) repositories.Pharmac
 const pharmacySelectColumns = `
 	id, owner_user_id, name, slug, description, phone, email, website, logo_url,
 	authorization_document_url, chain_id, chain_name,
+	source_pharmacy_code, ruc, technical_director, hours_raw,
 	street, city, state, postal_code, country,
 	ST_Y(location::geometry) AS latitude,
 	ST_X(location::geometry) AS longitude,
@@ -36,19 +37,22 @@ func (r *PharmacyRepositoryImpl) Create(ctx context.Context, pharmacy *entities.
 		INSERT INTO pharmacy.pharmacies
 			(id, owner_user_id, name, slug, description, phone, email, website, logo_url,
 			 authorization_document_url, chain_id, chain_name,
+			 source_pharmacy_code, ruc, technical_director, hours_raw,
 			 street, city, state, postal_code, country, location,
 			 is_verified, is_active, is_24h, created_at, updated_at)
 		VALUES
 			($1, $2, $3, $4, $5, $6, $7, $8, $9,
 			 $10, $11, $12,
-			 $13, $14, $15, $16, $17, ST_MakePoint($18, $19)::geography,
-			 $20, $21, $22, $23, $24)
+			 $13, NULLIF($14,''), NULLIF($15,''), NULLIF($16,''),
+			 $17, $18, $19, $20, $21, ST_MakePoint($22, $23)::geography,
+			 $24, $25, $26, $27, $28)
 	`
 	now := time.Now()
 	result := r.db.WithContext(ctx).Exec(query,
 		pharmacy.ID, pharmacy.OwnerUserID, pharmacy.Name, pharmacy.Slug,
 		pharmacy.Description, pharmacy.Phone, pharmacy.Email, pharmacy.Website, pharmacy.LogoURL,
 		pharmacy.AuthorizationDocumentURL, pharmacy.ChainID, pharmacy.ChainName,
+		pharmacy.SourcePharmacyCode, pharmacy.RUC, pharmacy.TechnicalDirector, pharmacy.HoursRaw,
 		pharmacy.Street, pharmacy.City, pharmacy.State, pharmacy.PostalCode, pharmacy.Country,
 		pharmacy.Longitude, pharmacy.Latitude,
 		pharmacy.IsVerified, pharmacy.IsActive, pharmacy.Is24h, now, now,
@@ -201,9 +205,12 @@ func (r *PharmacyRepositoryImpl) Update(ctx context.Context, pharmacy *entities.
 			name = $2, slug = $3, description = $4, phone = $5, email = $6,
 			website = $7, logo_url = $8, authorization_document_url = $9,
 			chain_id = $10, chain_name = $11,
-			street = $12, city = $13, state = $14,
-			postal_code = $15, country = $16, location = ST_MakePoint($17, $18)::geography,
-			is_verified = $19, is_active = $20, is_24h = $21, updated_at = $22
+			ruc = COALESCE(NULLIF($12,''), ruc),
+			technical_director = COALESCE(NULLIF($13,''), technical_director),
+			hours_raw = COALESCE(NULLIF($14,''), hours_raw),
+			street = $15, city = $16, state = $17,
+			postal_code = $18, country = $19, location = ST_MakePoint($20, $21)::geography,
+			is_verified = $22, is_active = $23, is_24h = $24, updated_at = $25
 		WHERE id = $1
 	`
 	result := r.db.WithContext(ctx).Exec(query,
@@ -211,6 +218,7 @@ func (r *PharmacyRepositoryImpl) Update(ctx context.Context, pharmacy *entities.
 		pharmacy.Phone, pharmacy.Email, pharmacy.Website, pharmacy.LogoURL,
 		pharmacy.AuthorizationDocumentURL,
 		pharmacy.ChainID, pharmacy.ChainName,
+		pharmacy.RUC, pharmacy.TechnicalDirector, pharmacy.HoursRaw,
 		pharmacy.Street, pharmacy.City, pharmacy.State, pharmacy.PostalCode, pharmacy.Country,
 		pharmacy.Longitude, pharmacy.Latitude,
 		pharmacy.IsVerified, pharmacy.IsActive, pharmacy.Is24h, pharmacy.UpdatedAt,

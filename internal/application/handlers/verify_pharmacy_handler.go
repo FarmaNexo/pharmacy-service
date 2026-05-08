@@ -57,7 +57,11 @@ func (h *VerifyPharmacyHandler) Handle(ctx context.Context, cmd commands.VerifyP
 	}()
 
 	go func() {
-		event := events.NewPharmacyEvent(events.EventPharmacyVerified, pharmacy.ID, pharmacy.OwnerUserID)
+		ownerID := ""
+		if pharmacy.OwnerUserID != nil {
+			ownerID = *pharmacy.OwnerUserID
+		}
+		event := events.NewPharmacyEvent(events.EventPharmacyVerified, pharmacy.ID, ownerID)
 		if err := h.eventPublisher.Publish(context.Background(), event); err != nil {
 			h.logger.Error("Error publicando evento PHARMACY_VERIFIED", zap.Error(err))
 		}
