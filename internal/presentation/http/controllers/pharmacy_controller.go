@@ -222,6 +222,25 @@ func (c *PharmacyController) GetPharmacyInventory(w http.ResponseWriter, r *http
 	c.respondJSON(w, response)
 }
 
+// GetInventoryItem godoc
+// @Summary      Inventario single-item (farmacia + producto)
+// @Description  Retorna un item de inventario por (pharmacy_id, product_id). Consumido por order-service al validar stock.
+// @Tags         Pharmacies
+// @Produce      json
+// @Param        id          path  string  true  "Pharmacy ID"
+// @Param        productId   path  string  true  "Product ID"
+// @Success      200  {object}  common.ApiResponse[responses.InventoryItemResponse]
+// @Failure      404  {object}  common.ApiResponse[responses.InventoryItemResponse]
+// @Router       /api/v1/pharmacies/{id}/inventory/{productId} [get]
+func (c *PharmacyController) GetInventoryItem(w http.ResponseWriter, r *http.Request) {
+	pharmacyID := chi.URLParam(r, "id")
+	productID := chi.URLParam(r, "productId")
+	query := queries.GetInventoryItemQuery{PharmacyID: pharmacyID, ProductID: productID}
+
+	response, _ := mediator.Send[queries.GetInventoryItemQuery, responses.InventoryItemResponse](r.Context(), c.mediator, query)
+	c.respondJSON(w, response)
+}
+
 // GetPharmacyHours godoc
 // @Summary      Horarios de farmacia
 // @Description  Retorna los horarios de una farmacia

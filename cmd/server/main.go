@@ -170,6 +170,9 @@ func main() {
 	listInventoryHandler := handlers.NewListPharmacyInventoryHandler(pharmacyRepo, inventoryRepo, cacheService, logger)
 	mediator.RegisterHandler(med, listInventoryHandler)
 
+	getInventoryItemHandler := handlers.NewGetInventoryItemHandler(pharmacyRepo, inventoryRepo, logger)
+	mediator.RegisterHandler(med, getInventoryItemHandler)
+
 	addInventoryHandler := handlers.NewAddInventoryItemHandler(pharmacyRepo, inventoryRepo, eventPublisher, cacheService, logger)
 	mediator.RegisterHandler(med, addInventoryHandler)
 

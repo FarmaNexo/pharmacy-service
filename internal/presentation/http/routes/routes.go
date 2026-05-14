@@ -69,6 +69,7 @@ func SetupRoutes(
 			r.Get("/inventory/product/{productId}", pharmacyController.GetInventoryByProduct)
 			r.Get("/{id}", pharmacyController.GetPharmacy)
 			r.Get("/{id}/inventory", pharmacyController.GetPharmacyInventory)
+			r.Get("/{id}/inventory/{productId}", pharmacyController.GetInventoryItem)
 			r.Get("/{id}/hours", pharmacyController.GetPharmacyHours)
 
 			// ========================================

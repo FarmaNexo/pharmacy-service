@@ -161,6 +161,21 @@ func ToInventoryItemResponse(item *entities.PharmacyInventory) InventoryItemResp
 	}
 }
 
+// ToInventoryItemResponseWithPharmacy combina un PharmacyInventory con los
+// datos de la Pharmacy correspondiente. Lo usa el lookup single-item
+// (GET /pharmacies/{id}/inventory/{productId}) consumido por order-service.
+//
+// Nota: `pharmacy_district` se llena desde `Pharmacy.City` siguiendo la
+// convención DIGEMID (ver InventoryWithPharmacy en el repo).
+func ToInventoryItemResponseWithPharmacy(item *entities.PharmacyInventory, p *entities.Pharmacy) InventoryItemResponse {
+	resp := ToInventoryItemResponse(item)
+	resp.PharmacyName = p.Name
+	resp.PharmacySlug = p.Slug
+	resp.PharmacyDistrict = p.City
+	resp.PharmacyAddress = p.Street
+	return resp
+}
+
 func ToHoursResponse(h *entities.PharmacyHours) HoursResponse {
 	return HoursResponse{
 		ID:        h.ID,
