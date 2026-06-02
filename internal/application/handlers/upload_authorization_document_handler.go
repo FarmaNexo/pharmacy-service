@@ -52,10 +52,12 @@ func NewUploadAuthorizationDocumentHandler(
 }
 
 func (h *UploadAuthorizationDocumentHandler) Handle(ctx context.Context, cmd commands.UploadAuthorizationDocumentCommand) (*common.ApiResponse[responses.AuthorizationDocumentResponse], error) {
-	// Verify pharmacy exists
-	pharmacy, err := h.pharmacyRepo.FindByID(ctx, cmd.PharmacyID)
-	if err != nil || pharmacy == nil {
+	pharmacy, owns := assertPharmacyOwnership(ctx, h.pharmacyRepo, cmd.PharmacyID)
+	switch owns {
+	case OwnershipNotFound:
 		return common.NotFoundResponse[responses.AuthorizationDocumentResponse]("Farmacia no encontrada"), nil
+	case OwnershipForbidden:
+		return common.ForbiddenResponse[responses.AuthorizationDocumentResponse]("No tienes permiso para subir documentos a esta farmacia"), nil
 	}
 
 	// Validate file type

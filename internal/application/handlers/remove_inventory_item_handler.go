@@ -15,17 +15,20 @@ import (
 )
 
 type RemoveInventoryItemHandler struct {
+	pharmacyRepo  repositories.PharmacyRepository
 	inventoryRepo repositories.InventoryRepository
 	cacheService  services.CacheService
 	logger        *zap.Logger
 }
 
 func NewRemoveInventoryItemHandler(
+	pharmacyRepo repositories.PharmacyRepository,
 	inventoryRepo repositories.InventoryRepository,
 	cacheService services.CacheService,
 	logger *zap.Logger,
 ) *RemoveInventoryItemHandler {
 	return &RemoveInventoryItemHandler{
+		pharmacyRepo:  pharmacyRepo,
 		inventoryRepo: inventoryRepo,
 		cacheService:  cacheService,
 		logger:        logger,
@@ -33,6 +36,13 @@ func NewRemoveInventoryItemHandler(
 }
 
 func (h *RemoveInventoryItemHandler) Handle(ctx context.Context, cmd commands.RemoveInventoryItemCommand) (*common.ApiResponse[responses.EmptyResponse], error) {
+	if _, owns := assertPharmacyOwnership(ctx, h.pharmacyRepo, cmd.PharmacyID); owns != OwnershipOK {
+		if owns == OwnershipNotFound {
+			return common.NotFoundResponse[responses.EmptyResponse]("Farmacia no encontrada"), nil
+		}
+		return common.ForbiddenResponse[responses.EmptyResponse]("No tienes permiso para gestionar el inventario de esta farmacia"), nil
+	}
+
 	item, err := h.inventoryRepo.FindByPharmacyAndProduct(ctx, cmd.PharmacyID, cmd.ProductID)
 	if err != nil || item == nil {
 		return common.NotFoundResponse[responses.EmptyResponse]("Producto no encontrado en inventario"), nil

@@ -33,9 +33,12 @@ func NewUpdatePharmacyHandler(
 }
 
 func (h *UpdatePharmacyHandler) Handle(ctx context.Context, cmd commands.UpdatePharmacyCommand) (*common.ApiResponse[responses.PharmacyResponse], error) {
-	pharmacy, err := h.pharmacyRepo.FindByID(ctx, cmd.ID)
-	if err != nil || pharmacy == nil {
+	pharmacy, owns := assertPharmacyOwnership(ctx, h.pharmacyRepo, cmd.ID)
+	switch owns {
+	case OwnershipNotFound:
 		return common.NotFoundResponse[responses.PharmacyResponse]("Farmacia no encontrada"), nil
+	case OwnershipForbidden:
+		return common.ForbiddenResponse[responses.PharmacyResponse]("No tienes permiso para modificar esta farmacia"), nil
 	}
 
 	if cmd.Name != "" {

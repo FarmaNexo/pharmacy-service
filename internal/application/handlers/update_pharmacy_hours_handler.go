@@ -36,9 +36,11 @@ func NewUpdatePharmacyHoursHandler(
 }
 
 func (h *UpdatePharmacyHoursHandler) Handle(ctx context.Context, cmd commands.UpdatePharmacyHoursCommand) (*common.ApiResponse[responses.HoursListResponse], error) {
-	pharmacy, err := h.pharmacyRepo.FindByID(ctx, cmd.PharmacyID)
-	if err != nil || pharmacy == nil {
-		return common.NotFoundResponse[responses.HoursListResponse]("Farmacia no encontrada"), nil
+	if _, owns := assertPharmacyOwnership(ctx, h.pharmacyRepo, cmd.PharmacyID); owns != OwnershipOK {
+		if owns == OwnershipNotFound {
+			return common.NotFoundResponse[responses.HoursListResponse]("Farmacia no encontrada"), nil
+		}
+		return common.ForbiddenResponse[responses.HoursListResponse]("No tienes permiso para modificar los horarios de esta farmacia"), nil
 	}
 
 	hoursEntities := make([]entities.PharmacyHours, len(cmd.Hours))

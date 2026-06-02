@@ -41,9 +41,11 @@ func NewAddInventoryItemHandler(
 }
 
 func (h *AddInventoryItemHandler) Handle(ctx context.Context, cmd commands.AddInventoryItemCommand) (*common.ApiResponse[responses.InventoryItemResponse], error) {
-	pharmacy, err := h.pharmacyRepo.FindByID(ctx, cmd.PharmacyID)
-	if err != nil || pharmacy == nil {
-		return common.NotFoundResponse[responses.InventoryItemResponse]("Farmacia no encontrada"), nil
+	if _, owns := assertPharmacyOwnership(ctx, h.pharmacyRepo, cmd.PharmacyID); owns != OwnershipOK {
+		if owns == OwnershipNotFound {
+			return common.NotFoundResponse[responses.InventoryItemResponse]("Farmacia no encontrada"), nil
+		}
+		return common.ForbiddenResponse[responses.InventoryItemResponse]("No tienes permiso para gestionar el inventario de esta farmacia"), nil
 	}
 
 	existing, _ := h.inventoryRepo.FindByPharmacyAndProduct(ctx, cmd.PharmacyID, cmd.ProductID)

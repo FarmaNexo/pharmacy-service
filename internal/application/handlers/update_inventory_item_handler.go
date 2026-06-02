@@ -15,6 +15,7 @@ import (
 )
 
 type UpdateInventoryItemHandler struct {
+	pharmacyRepo   repositories.PharmacyRepository
 	inventoryRepo  repositories.InventoryRepository
 	eventPublisher services.EventPublisher
 	cacheService   services.CacheService
@@ -22,12 +23,14 @@ type UpdateInventoryItemHandler struct {
 }
 
 func NewUpdateInventoryItemHandler(
+	pharmacyRepo repositories.PharmacyRepository,
 	inventoryRepo repositories.InventoryRepository,
 	eventPublisher services.EventPublisher,
 	cacheService services.CacheService,
 	logger *zap.Logger,
 ) *UpdateInventoryItemHandler {
 	return &UpdateInventoryItemHandler{
+		pharmacyRepo:   pharmacyRepo,
 		inventoryRepo:  inventoryRepo,
 		eventPublisher: eventPublisher,
 		cacheService:   cacheService,
@@ -36,6 +39,13 @@ func NewUpdateInventoryItemHandler(
 }
 
 func (h *UpdateInventoryItemHandler) Handle(ctx context.Context, cmd commands.UpdateInventoryItemCommand) (*common.ApiResponse[responses.InventoryItemResponse], error) {
+	if _, owns := assertPharmacyOwnership(ctx, h.pharmacyRepo, cmd.PharmacyID); owns != OwnershipOK {
+		if owns == OwnershipNotFound {
+			return common.NotFoundResponse[responses.InventoryItemResponse]("Farmacia no encontrada"), nil
+		}
+		return common.ForbiddenResponse[responses.InventoryItemResponse]("No tienes permiso para gestionar el inventario de esta farmacia"), nil
+	}
+
 	item, err := h.inventoryRepo.FindByPharmacyAndProduct(ctx, cmd.PharmacyID, cmd.ProductID)
 	if err != nil || item == nil {
 		return common.NotFoundResponse[responses.InventoryItemResponse]("Producto no encontrado en inventario"), nil
